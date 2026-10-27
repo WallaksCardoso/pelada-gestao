@@ -18,6 +18,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class SorteioServiceImpl implements SorteioService {
@@ -86,7 +88,7 @@ public class SorteioServiceImpl implements SorteioService {
             timeVermelho.add(goleiros.get(1));
             reservas.addAll(goleiros.subList(2, goleiros.size()));
         } else if (goleiros.size() == 1) {
-            timeAzul.add(goleiros.get(0));
+            (Math.random() < 0.5 ? timeAzul : timeVermelho).add(goleiros.get(0));
         }
 
         for (Jogador jogador : naoGoleiros) {
@@ -128,9 +130,15 @@ public class SorteioServiceImpl implements SorteioService {
         List<Jogador> timeVermelho = new ArrayList<>();
         List<Jogador> reservas = new ArrayList<>();
 
+        Map<Long, Jogador> jogadoresPorId = jogadorRepository
+                .findAllById(sorteados.stream().map(JogadorSorteado::getJogadorId).toList())
+                .stream()
+                .collect(Collectors.toMap(Jogador::getId, Function.identity()));
         for (JogadorSorteado js : sorteados) {
-            Jogador jogador = jogadorRepository.findById(js.getJogadorId())
-                    .orElseThrow(() -> new RecursoNaoEncontradoException("Jogador não encontrado com id: " + js.getJogadorId()));
+            Jogador jogador = jogadoresPorId.get(js.getJogadorId());
+            if (jogador == null) {
+                throw new RecursoNaoEncontradoException("Jogador não encontrado com id: " + js.getJogadorId());
+            }
 
             switch (js.getTime()) {
                 case AZUL -> timeAzul.add(jogador);

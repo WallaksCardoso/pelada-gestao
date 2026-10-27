@@ -4,11 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.pelada_gestao.domain.model.Jogador;
+import com.pelada_gestao.domain.model.JogadorSorteado;
+import com.pelada_gestao.enuns.TimeEnum;
 import com.pelada_gestao.domain.model.Sorteio;
 import com.pelada_gestao.exception.custom.OperacaoNaoPermitidaException;
 import com.pelada_gestao.repository.JogadorRepository;
@@ -18,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -90,6 +94,39 @@ class SorteioServiceImplTest {
         assertThat(sorteio.isSorteado()).isTrue();
         verify(sorteioRepository).save(sorteio);
         verify(jogadorSorteadoRepository, times(3)).saveAll(any());
+    }
+
+    @Test
+    void comUmGoleiroSoEleVaiParaUmDosTimes() {
+        when(jogadorRepository.findBySorteioId(1L)).thenReturn(jogadores(1, 6));
+
+        Map<String, List<Jogador>> resultado = service.sortearTimes(1L);
+
+        long goleirosNosTimes = Stream
+                .concat(resultado.get("timeAzul").stream(), resultado.get("timeVermelho").stream())
+                .filter(Jogador::isGoleiro)
+                .count();
+        assertThat(goleirosNosTimes).isEqualTo(1);
+        assertThat(resultado.values().stream().mapToInt(List::size).sum()).isEqualTo(7);
+    }
+
+    @Test
+    void resultadoBuscaOsJogadoresDeUmaVez() {
+        sorteio.setSorteado(true);
+        JogadorSorteado azul = new JogadorSorteado();
+        azul.setJogadorId(1L);
+        azul.setTime(TimeEnum.AZUL);
+        JogadorSorteado vermelho = new JogadorSorteado();
+        vermelho.setJogadorId(2L);
+        vermelho.setTime(TimeEnum.VERMELHO);
+        when(jogadorSorteadoRepository.findBySorteioId(1L)).thenReturn(List.of(azul, vermelho));
+        when(jogadorRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(jogador(1L, false), jogador(2L, true)));
+
+        Map<String, List<Jogador>> resultado = service.resultadoDoSorteio(1L);
+
+        assertThat(resultado.get("timeAzul")).extracting(Jogador::getId).containsExactly(1L);
+        assertThat(resultado.get("timeVermelho")).extracting(Jogador::getId).containsExactly(2L);
+        verify(jogadorRepository, never()).findById(any());
     }
 
     @Test

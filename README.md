@@ -26,6 +26,7 @@ Faz parte de um sistema em microsserviços:
 - Sorteio dos times **Azul** e **Vermelho**:
   - a lista é embaralhada;
   - com dois goleiros ou mais, cada time recebe um; os demais goleiros vão para a reserva;
+  - com um goleiro só, ele vai para um dos times, sorteado;
   - os jogadores de linha completam os times até o número por equipe, e o restante fica na reserva.
 - Um sorteio só pode ser realizado uma vez; o resultado fica salvo e pode ser consultado depois
 - Cada usuário só exclui os sorteios e jogadores que ele mesmo cadastrou
@@ -72,6 +73,7 @@ Pré-requisitos: Java 21, um PostgreSQL acessível e a mesma chave JWT usada no
 | `JWT_SECRET` | Chave de validação do token (a mesma do serviço de autenticação) |
 | `PELADA_KAFKA_ENABLED` | Opcional. `true` para publicar os eventos no Kafka (padrão: `false`) |
 | `KAFKA_BOOTSTRAP_SERVERS` | Opcional. Endereço do Kafka (padrão: `localhost:9092`) |
+| `CORS_ORIGENS` | Opcional. Origens liberadas no navegador, separadas por vírgula (padrão: Live Server local e `https://wallakscardoso.github.io`) |
 
 ```bash
 ./mvnw spring-boot:run
@@ -108,8 +110,9 @@ docker run -p 8080:8080 \
 ./mvnw verify
 ```
 
-Os testes do sorteio rodam sem banco: conferem um goleiro por time, que nenhum jogador fica de fora,
-que o sorteio fica marcado como realizado e que não pode ser repetido. Há também um teste que sobe a
+Os testes do sorteio rodam sem banco: conferem um goleiro por time, o caso de um goleiro só, que nenhum
+jogador fica de fora, que o sorteio fica marcado como realizado, que não pode ser repetido e que o
+resultado busca os jogadores em uma consulta só. Há também um teste que sobe a
 aplicação inteira com H2 em memória. A CI roda os testes e monta a imagem Docker a cada push.
 
 ## Estrutura
