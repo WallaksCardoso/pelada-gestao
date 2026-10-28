@@ -16,8 +16,7 @@ Faz parte de um sistema em microsserviços:
 - **pelada-gestao** (este) valida esse token com a mesma chave e guarda sorteios e jogadores.
 - **[email-service](https://github.com/WallaksCardoso/email-service)** recebe pelo Kafka cada jogador
   cadastrado e envia o e-mail de notificação.
-- **[pelada-gestao-front](https://github.com/WallaksCardoso/pelada-gestao-front)** e
-  **[pelada-gestao-front-web](https://github.com/WallaksCardoso/pelada-gestao-front-web)** são as interfaces.
+- **[pelada-gestao-front-web](https://github.com/WallaksCardoso/pelada-gestao-front-web)** é a interface, em Flutter.
 
 ## Funcionalidades
 
@@ -62,6 +61,32 @@ A especificação OpenAPI completa está em `src/main/resources/pelada-gestao.js
 
 ## Como rodar
 
+### Sistema completo com Docker Compose
+
+Pré-requisito: Docker com Compose.
+
+```bash
+docker compose up -d --build
+```
+
+Sobe o sistema inteiro, montando os outros serviços direto dos repositórios no GitHub:
+
+| Serviço | Endereço |
+| --- | --- |
+| Interface ([pelada-gestao-front-web](https://github.com/WallaksCardoso/pelada-gestao-front-web)) | <http://localhost:3000> |
+| Autenticação ([spring-jwt-auth](https://github.com/WallaksCardoso/spring-jwt-auth)) | <http://localhost:8081> |
+| API da pelada (este) | <http://localhost:8080> |
+| E-mails enviados, capturados pelo Mailpit | <http://localhost:8025> |
+
+Também sobem o PostgreSQL (um banco para cada serviço), o Kafka e o
+[email-service](https://github.com/WallaksCardoso/email-service). Para testar: crie um usuário na tela de
+login, crie uma lista com um e-mail de notificação qualquer, cadastre os jogadores e sorteie. Cada
+jogador cadastrado gera um e-mail, que aparece no Mailpit.
+
+Para parar, `docker compose down`; para apagar também os dados, `docker compose down -v`.
+
+### Só a API
+
 Pré-requisitos: Java 21, um PostgreSQL acessível e a mesma chave JWT usada no
 [spring-jwt-auth](https://github.com/WallaksCardoso/spring-jwt-auth).
 
@@ -86,15 +111,7 @@ automaticamente:
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
-Kafka local para testar as notificações:
-
-```bash
-docker compose -f docker-compose.kafka.yml up -d
-```
-
-Sobe Kafka, Zookeeper e o painel Kafka UI em `http://localhost:9000`.
-
-Com Docker:
+Só a imagem da API:
 
 ```bash
 docker build -t pelada-gestao .
@@ -118,6 +135,8 @@ aplicação inteira com H2 em memória. A CI roda os testes e monta a imagem Doc
 ## Estrutura
 
 ```
+docker-compose.yml   sistema completo para rodar localmente
+docker/              inicialização do PostgreSQL
 src/main/java/com/pelada_gestao/
   config/        CORS
   controller/    rotas de sorteios e jogadores
