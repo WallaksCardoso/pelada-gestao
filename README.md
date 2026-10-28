@@ -1,125 +1,90 @@
-# Pelada Gestão
-
-API REST para organizar a pelada: cria sorteios, recebe a lista de jogadores e sorteia dois times
-equilibrando os goleiros.
+# pelada-gestao
 
 [![CI](https://github.com/WallaksCardoso/pelada-gestao/actions/workflows/ci.yml/badge.svg)](https://github.com/WallaksCardoso/pelada-gestao/actions/workflows/ci.yml)
-![Java](https://img.shields.io/badge/Java-21-informational)
-![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.5-informational)
-[![Licença](https://img.shields.io/badge/licen%C3%A7a-MIT-informational)](LICENSE)
 
-## Sobre
+API da pelada: cria a lista da semana, recebe os jogadores e sorteia os times Azul e Vermelho.
 
-Faz parte de um sistema em microsserviços:
+Começou como uma API só e virou meu laboratório de microsserviços. Hoje são três serviços Spring
+Boot e uma interface:
 
-- **[spring-jwt-auth](https://github.com/WallaksCardoso/spring-jwt-auth)** cadastra os usuários e emite o token JWT.
-- **pelada-gestao** (este) valida esse token com a mesma chave e guarda sorteios e jogadores.
-- **[email-service](https://github.com/WallaksCardoso/email-service)** recebe pelo Kafka cada jogador
-  cadastrado e envia o e-mail de notificação.
-- **[pelada-gestao-front-web](https://github.com/WallaksCardoso/pelada-gestao-front-web)** é a interface, em Flutter.
+- [spring-jwt-auth](https://github.com/WallaksCardoso/spring-jwt-auth) cadastra os usuários e emite
+  o JWT, que esta API valida com a mesma chave;
+- esta API guarda listas e jogadores no PostgreSQL e publica um evento no Kafka a cada jogador;
+- [email-service](https://github.com/WallaksCardoso/email-service) consome esse evento e manda o
+  e-mail de notificação;
+- [pelada-gestao-front-web](https://github.com/WallaksCardoso/pelada-gestao-front-web) é a tela, em
+  Flutter.
 
-## Funcionalidades
+## Subindo tudo
 
-- Cadastro de sorteios com nome, data, jogadores por equipe e e-mail de notificação
-- Cadastro de jogadores no sorteio, marcando quem é goleiro
-- Sorteio dos times **Azul** e **Vermelho**:
-  - a lista é embaralhada;
-  - com dois goleiros ou mais, cada time recebe um; os demais goleiros vão para a reserva;
-  - com um goleiro só, ele vai para um dos times, sorteado;
-  - os jogadores de linha completam os times até o número por equipe, e o restante fica na reserva.
-- Um sorteio só pode ser realizado uma vez; o resultado fica salvo e pode ser consultado depois
-- Cada usuário só exclui os sorteios e jogadores que ele mesmo cadastrou
-- Nomes repetidos são recusados (sorteio por usuário, jogador por sorteio)
-- Publicação opcional de evento no Kafka a cada jogador cadastrado
-
-## Stack
-
-- Java 21 e Spring Boot 3.5 (Web, Security, Data JPA, Validation, Actuator)
-- JJWT para validar o token
-- PostgreSQL em produção; H2 em memória nos testes
-- Spring for Apache Kafka
-- springdoc-openapi (Swagger UI)
-- Maven, Docker e GitHub Actions
-
-## Endpoints
-
-Todos exigem `Authorization: Bearer <token>`, exceto `/actuator/**`.
-
-| Método | Rota | Descrição |
-| --- | --- | --- |
-| `POST` | `/api/sorteios` | Cria um sorteio |
-| `GET` | `/api/sorteios` | Lista os sorteios |
-| `GET` | `/api/sorteios/{id}` | Detalha um sorteio |
-| `DELETE` | `/api/sorteios/{id}` | Exclui um sorteio do usuário |
-| `GET` | `/api/sorteios/sortear/{id}` | Sorteia os times |
-| `GET` | `/api/sorteios/resultado/{id}` | Mostra o resultado já sorteado |
-| `POST` | `/api/jogadores` | Cadastra um jogador em um sorteio |
-| `GET` | `/api/jogadores` | Lista os jogadores |
-| `DELETE` | `/api/jogadores/{id}` | Exclui um jogador do usuário |
-
-A especificação OpenAPI completa está em `src/main/resources/pelada-gestao.json`.
-
-## Como rodar
-
-### Sistema completo com Docker Compose
-
-Pré-requisito: Docker com Compose.
+Com Docker:
 
 ```bash
 docker compose up -d --build
 ```
 
-Sobe o sistema inteiro, montando os outros serviços direto dos repositórios no GitHub:
+O compose monta os outros serviços direto dos repositórios no GitHub e sobe junto o PostgreSQL, o
+Kafka e o Mailpit:
 
-| Serviço | Endereço |
+| | |
 | --- | --- |
-| Interface ([pelada-gestao-front-web](https://github.com/WallaksCardoso/pelada-gestao-front-web)) | <http://localhost:3000> |
-| Autenticação ([spring-jwt-auth](https://github.com/WallaksCardoso/spring-jwt-auth)) | <http://localhost:8081> |
-| API da pelada (este) | <http://localhost:8080> |
-| E-mails enviados, capturados pelo Mailpit | <http://localhost:8025> |
+| Interface | <http://localhost:3000> |
+| Autenticação | <http://localhost:8081> |
+| Esta API | <http://localhost:8080> |
+| E-mails enviados (Mailpit) | <http://localhost:8025> |
 
-Também sobem o PostgreSQL (um banco para cada serviço), o Kafka e o
-[email-service](https://github.com/WallaksCardoso/email-service). Para testar: crie um usuário na tela de
-login, crie uma lista com um e-mail de notificação qualquer, cadastre os jogadores e sorteie. Cada
-jogador cadastrado gera um e-mail, que aparece no Mailpit.
+Crie um usuário, uma lista com qualquer e-mail de notificação, cadastre os jogadores e sorteie. Cada
+jogador cadastrado aparece como e-mail no Mailpit. `docker compose down -v` derruba tudo e apaga os
+dados.
 
-Para parar, `docker compose down`; para apagar também os dados, `docker compose down -v`.
+## O sorteio
 
-### Só a API
+A lista é embaralhada. Com dois goleiros ou mais, cada time recebe um e os outros vão para a reserva;
+com um só, ele cai em um dos times por sorteio. Os jogadores de linha completam os times até o número
+por equipe (que conta o goleiro) e o resto fica na reserva. Cada lista só pode ser sorteada uma vez,
+e o resultado fica salvo.
 
-Pré-requisitos: Java 21, um PostgreSQL acessível e a mesma chave JWT usada no
-[spring-jwt-auth](https://github.com/WallaksCardoso/spring-jwt-auth).
+Cada usuário só exclui as listas e os jogadores que ele mesmo cadastrou.
 
-| Variável | Descrição |
-| --- | --- |
-| `SPRING_DATASOURCE_URL` | URL JDBC do PostgreSQL |
-| `SPRING_DATASOURCE_USERNAME` | Usuário do banco |
-| `SPRING_DATASOURCE_PASSWORD` | Senha do banco |
-| `JWT_SECRET` | Chave de validação do token (a mesma do serviço de autenticação) |
-| `PELADA_KAFKA_ENABLED` | Opcional. `true` para publicar os eventos no Kafka (padrão: `false`) |
-| `KAFKA_BOOTSTRAP_SERVERS` | Opcional. Endereço do Kafka (padrão: `localhost:9092`) |
-| `CORS_ORIGENS` | Opcional. Origens liberadas no navegador, separadas por vírgula (padrão: Live Server local e `https://wallakscardoso.github.io`) |
+## Rotas
+
+Todas pedem `Authorization: Bearer <token>`, menos `/actuator/**`.
+
+| Método | Rota | |
+| --- | --- | --- |
+| `POST` | `/api/sorteios` | cria uma lista |
+| `GET` | `/api/sorteios` | lista todas |
+| `GET` | `/api/sorteios/{id}` | detalha uma |
+| `DELETE` | `/api/sorteios/{id}` | exclui (só quem criou) |
+| `GET` | `/api/sorteios/sortear/{id}` | sorteia os times |
+| `GET` | `/api/sorteios/resultado/{id}` | resultado já sorteado |
+| `POST` | `/api/jogadores` | cadastra um jogador |
+| `GET` | `/api/jogadores` | lista os jogadores |
+| `DELETE` | `/api/jogadores/{id}` | exclui (só quem cadastrou) |
+
+A especificação OpenAPI está em `src/main/resources/pelada-gestao.json`.
+
+## Rodando só a API
+
+Java 21, um PostgreSQL e a mesma chave JWT do serviço de autenticação:
 
 ```bash
-./mvnw spring-boot:run
-```
-
-Para desenvolvimento, o perfil `local` (`application-local.properties`) cria as tabelas
-automaticamente:
-
-```bash
+export SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/pelada
+export SPRING_DATASOURCE_USERNAME=postgres
+export SPRING_DATASOURCE_PASSWORD=postgres
+export JWT_SECRET=a-mesma-chave-do-spring-jwt-auth
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
-Só a imagem da API:
+O perfil `local` cria as tabelas. Para publicar os eventos, `PELADA_KAFKA_ENABLED=true` e
+`KAFKA_BOOTSTRAP_SERVERS`. As origens do navegador ficam em `CORS_ORIGENS`.
 
-```bash
-docker build -t pelada-gestao .
-docker run -p 8080:8080 \
-  -e SPRING_DATASOURCE_URL=... -e SPRING_DATASOURCE_USERNAME=... \
-  -e SPRING_DATASOURCE_PASSWORD=... -e JWT_SECRET=... \
-  pelada-gestao
-```
+## Publicando
+
+Já rodou no Render (plano gratuito) com o banco no Supabase. Para publicar de novo: um Web Service do
+tipo Docker apontando para este repositório, as variáveis acima com a URL JDBC do banco hospedado e o
+health check em `/actuator/health`. O mesmo vale para o spring-jwt-auth. No plano gratuito o serviço
+dorme quando fica parado e leva quase um minuto para acordar.
 
 ## Testes
 
@@ -127,29 +92,9 @@ docker run -p 8080:8080 \
 ./mvnw verify
 ```
 
-Os testes do sorteio rodam sem banco: conferem um goleiro por time, o caso de um goleiro só, que nenhum
-jogador fica de fora, que o sorteio fica marcado como realizado, que não pode ser repetido e que o
-resultado busca os jogadores em uma consulta só. Há também um teste que sobe a
-aplicação inteira com H2 em memória. A CI roda os testes e monta a imagem Docker a cada push.
-
-## Estrutura
-
-```
-docker-compose.yml   sistema completo para rodar localmente
-docker/              inicialização do PostgreSQL
-src/main/java/com/pelada_gestao/
-  config/        CORS
-  controller/    rotas de sorteios e jogadores
-  domain/        entidades, requisições, respostas e evento
-  enuns/         times (azul, vermelho, reserva)
-  exception/     erros de negócio e tratamento global
-  kafka/         publicação dos eventos
-  repository/    acesso ao banco
-  scheduler/     consulta periódica que mantém o serviço ativo
-  security/      validação do JWT
-  service/       regras de sorteio e cadastro
-```
+Os do sorteio rodam sem banco: um goleiro por time, o caso de goleiro único, ninguém de fora, sorteio
+que não se repete e resultado montado com uma consulta só. Um teste sobe a aplicação inteira com H2.
 
 ## Licença
 
-[MIT](LICENSE)
+MIT
